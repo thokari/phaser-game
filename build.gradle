@@ -1,0 +1,20 @@
+apply plugin: 'groovy'
+
+repositories {
+  jcenter()
+}
+
+dependencies {
+   runtime 'io.vertx:vertx-web:3.2.1'
+}
+
+configurations.runtime.exclude module: 'vertx-core'
+
+task copyDeps(type: Copy) {
+  from configurations.runtime
+  into 'lib'
+}
+
+task wrappper(type: Wrapper) {
+  gradleVersion = '2.11'
+}
