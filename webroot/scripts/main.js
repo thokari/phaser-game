@@ -1,4 +1,4 @@
-var eb = new EventBus('http://localhost:8080/eventbus')
+var eb = new EventBus('http://192.168.1.3:8080/eventbus')
 var commandQueue = []
 var updateQueue = []
 var game, player1, player2
@@ -71,6 +71,7 @@ function create() {
 
 var UPDATES_PER_ROUNDTRIP = 6
 var currentRound = 0
+var replaying = true
 
 function update() {
     if (!ready) {
@@ -81,7 +82,7 @@ function update() {
     var updateData = updateQueue.shift()
     if (updateData) {
         while (updateData.r < currentRound) {
-
+            replaying = true
             doUpdate(player1, player2, updateData)
             updateData = updateQueue.shift()
             if (!updateData) {
@@ -89,6 +90,7 @@ function update() {
             }
         }
         if (updateData) {
+            replaying = false
             doUpdate(player1, player2, updateData)
         }
     }
@@ -108,8 +110,6 @@ function update() {
 function doUpdate (player1, player2, updateData) {
     var p1Command = updateData.c.filter(byPlayerId(player1.id))[0]
     var p2Command = updateData.c.filter(byPlayerId(player2.id))[0]
-    console.log('P1', p1Command)
-    console.log('P2', p2Command)
     if (p1Command) {
         player1.update(p1Command)
     }
@@ -119,7 +119,10 @@ function doUpdate (player1, player2, updateData) {
 }
 
 function render() {
-    // game.debug.spriteInfo(player1.sprite, 32, 32)
+    game.debug.text('round: ' + currentRound, 32, 32)
+    game.debug.text('commandQueue size: ' + commandQueue.length, 32, 48)
+    game.debug.text('updateQueue size: ' + updateQueue.length, 32, 64)
+    game.debug.text('replaying: ' + replaying, 32, 80)
 }
 
 function CommandData (playerId, input, forRound) {
@@ -155,9 +158,7 @@ Player.prototype.createSprite = function () {
 
 Player.prototype.update = function (command) {
     var game = this.game, sprite = this.sprite
-
     if (command.d) {
-        console.log('DDDDDDDDDD')
         sprite.rotation = game.physics.arcade.moveToXY(sprite, command.x, command.y, 60, 500)
         sprite.rotation = game.physics.arcade.moveToXY(sprite, command.x, command.y, 60, 500)
     } else {

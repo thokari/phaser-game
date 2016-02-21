@@ -91,4 +91,4 @@ vertx.setPeriodic(100, {
 })
 
 router.route('/*').handler(StaticHandler.create().setCachingEnabled(false))
-server.requestHandler(router.&accept).listen(8080)
+server.requestHandler(router.&accept).listen(8080, '192.168.1.3')
