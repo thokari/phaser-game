@@ -1,72 +1,100 @@
 var eb = new EventBus('http://localhost:8080/eventbus')
 var commandQueue = []
 var updateQueue = []
-var playerId = generateUUID()
-var game, sprite
+var game, player1, player2
+var ready = false
 
-eb.onopen = function() {
-    console.log('Starting player ' + playerId);
+eb.onopen = function () {
+    player1 = new Player(generateUUID())
+    console.log('creating player ' + player1.id)
     eb.registerHandler('browser.game', function(err, msg) {
         var body = msg.body
-        updateQueue = updateQueue.concat(body.commands)
-    });
+        switch (body.action) {
+            case 'ready':
+                console.log('ready received')
+                player2Id = body.playerIds.filter(function (pId) {
+                    return pId !== player1.id
+                })[0]
+                player2 = new Player(player2Id)
+                player2.game = game
+                player2.createSprite()
+                ready = true
+                break
+            case 'update':
+                updateQueue = updateQueue.concat(body.commands)
+                break
+            default:
+                break
+        }
+    })
     eb.send('server.game', {
-        'action': 'join',
-        'playerId': playerId
+        'action': 'init',
+        'playerId': player1.id
     }, function(result) {
         game = new Phaser.Game(800, 600, Phaser.AUTO, 'phaser-example', {
             preload: preload,
             create: create,
             update: update,
             render: render
-        });
-    });
+        })
+        ready = false
+    })
+}
+
+eb.onclose = function () {
+    eb.send('server.game', {
+        'action': 'disconnect',
+        'playerId': player1.id
+    })
 }
 
 function preload() {
+    console.log('preloading')
     game.load.image('arrow', '/images/arrow.png')
 }
 
-function render() {
-    game.debug.spriteInfo(sprite, 32, 32)
-}
-
 function create() {
+    console.log('creating')
     game.physics.startSystem(Phaser.Physics.ARCADE)
 
-    sprite = game.add.sprite(game.world.centerX, game.world.centerY, 'arrow')
-    sprite.anchor.setTo(0.5, 0.5)
+    player1.game = game
+    player1.createSprite()
 
-    game.physics.enable(sprite, Phaser.Physics.ARCADE)
-    sprite.body.allowRotation = false
+    eb.send('server.game', {
+        'action': 'created',
+        'playerId': player1.id
+    }, function (reply) {
+        console.log('got created reply')
+        console.log(reply)
+    })
 }
 
 var UPDATES_PER_ROUNDTRIP = 6
 var currentRound = 0
 
 function update() {
+    if (!ready) {
+      console.log('not ready')
+      return
+    }
     currentRound++
     var updateData = updateQueue.shift()
     if (updateData) {
-        console.log('update data', JSON.stringify(updateData))
         while (updateData.r < currentRound) {
-            console.log('replaying round:', updateData.r, 'current round:', currentRound)
-            doUpdate(game, sprite, updateData)
+
+            doUpdate(player1, player2, updateData)
             updateData = updateQueue.shift()
             if (!updateData) {
                 break
             }
         }
         if (updateData) {
-            doUpdate(game, sprite, updateData)
+            doUpdate(player1, player2, updateData)
         }
     }
 
-    // only push data on input (?)
-    if (game.input.mousePointer.isDown) {
-        var forRound = currentRound + UPDATES_PER_ROUNDTRIP
-        commandQueue.push(new CommandData(playerId, game.input, forRound).toJson())
-    }
+    var forRound = currentRound + UPDATES_PER_ROUNDTRIP
+    commandQueue.push(new CommandData(player1.id, game.input, forRound).toJson())
 
     if (currentRound % UPDATES_PER_ROUNDTRIP === 0) {
         eb.send('server.game', {
@@ -77,29 +105,69 @@ function update() {
     }
 }
 
-function doUpdate (game, sprite, commandData) {
-    if (commandData.d) {
-        sprite.rotation = game.physics.arcade.moveToXY(sprite, commandData.x, commandData.y, 60, 1000)
+function doUpdate (player1, player2, updateData) {
+    var p1Command = updateData.c.filter(byPlayerId(player1.id))[0]
+    var p2Command = updateData.c.filter(byPlayerId(player2.id))[0]
+    console.log('P1', p1Command)
+    console.log('P2', p2Command)
+    if (p1Command) {
+        player1.update(p1Command)
+    }
+    if (p2Command) {
+        player2.update(p2Command)
+    }
+}
+
+function render() {
+    // game.debug.spriteInfo(player1.sprite, 32, 32)
+}
+
+function CommandData (playerId, input, forRound) {
+    this.r = forRound,
+    this.c = [{
+        p: playerId,
+        d: input.mousePointer.isDown,
+        x: input.activePointer.x,
+        y: input.activePointer.y
+    }]
+}
+
+CommandData.prototype.toJson = function() {
+    return {
+        r: this.r,
+        c: this.c,
+    }
+}
+
+function Player (id) {
+    this.id = id
+    this.sprite = null
+    this.game = null
+}
+
+Player.prototype.createSprite = function () {
+    var game = this.game
+    this.sprite = game.add.sprite(game.world.centerX, game.world.centerY, 'arrow')
+    this.sprite.anchor.setTo(0.5, 0.5)
+    game.physics.enable(this.sprite, Phaser.Physics.ARCADE)
+    this.sprite.body.allowRotation = false
+}
+
+Player.prototype.update = function (command) {
+    var game = this.game, sprite = this.sprite
+
+    if (command.d) {
+        console.log('DDDDDDDDDD')
+        sprite.rotation = game.physics.arcade.moveToXY(sprite, command.x, command.y, 60, 500)
+        sprite.rotation = game.physics.arcade.moveToXY(sprite, command.x, command.y, 60, 500)
     } else {
         sprite.body.velocity.setTo(0, 0)
     }
 }
 
-function CommandData(playerId, input, forRound) {
-    this.p = playerId
-    this.r = forRound
-    this.d = input.mousePointer.isDown
-    this.x = input.activePointer.x
-    this.y = input.activePointer.y
-}
-
-CommandData.prototype.toJson = function() {
-    return {
-        p: this.p,
-        r: this.r,
-        d: this.d,
-        x: this.x,
-        y: this.y
+var byPlayerId = function (playerId) {
+    return function (command) {
+        return (playerId === command.p)
     }
 }
 
