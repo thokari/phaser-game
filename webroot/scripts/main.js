@@ -1,4 +1,4 @@
-var eb = new EventBus('http://192.168.1.3:8080/eventbus')
+var eb = new EventBus('/eventbus')
 var commandQueue = []
 var updateQueue = []
 var game, player1, player2
@@ -95,7 +95,7 @@ function update() {
         }
     }
 
-    var forRound = currentRound + UPDATES_PER_ROUNDTRIP
+    var forRound = currentRound + UPDATES_PER_ROUNDTRIP + 1
     commandQueue.push(new CommandData(player1.id, game.input, forRound).toJson())
 
     if (currentRound % UPDATES_PER_ROUNDTRIP === 0) {

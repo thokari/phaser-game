@@ -26,6 +26,7 @@ router.route('/eventbus/*').handler(sockJSHandler)
 def commands = []
 def playerIds = []
 def ready = false
+final int NUM_PLAYERS = 1
 
 def eb = vertx.eventBus()
 eb.consumer 'server.game', { msg ->
@@ -35,7 +36,7 @@ eb.consumer 'server.game', { msg ->
             updateCommands(body, commands)
             break
         case 'init':
-            if (playerIds.size() < 2) {
+            if (playerIds.size() < NUM_PLAYERS) {
                 println 'Player joined.'
                 msg.reply([status: 'ok'])
                 playerIds << body.playerId
@@ -44,8 +45,8 @@ eb.consumer 'server.game', { msg ->
             }
             break
         case 'created':
-            if (playerIds.size() == 2) {
-                println '2 Players created game, game ready.'
+            if (playerIds.size() == NUM_PLAYERS) {
+                println "${NUM_PLAYERS} Players created game, game ready."
                 eb.publish('browser.game', [
                     action: 'ready',
                     playerIds: playerIds
@@ -91,4 +92,4 @@ vertx.setPeriodic(100, {
 })
 
 router.route('/*').handler(StaticHandler.create().setCachingEnabled(false))
-server.requestHandler(router.&accept).listen(8080, '192.168.1.3')
+server.requestHandler(router.&accept).listen(8080, '0.0.0.0')
