@@ -1,6 +1,6 @@
 var eb = new EventBus('/eventbus')
-var commandQueue = []
 var updateQueue = []
+var commandQueue = []
 var game, player1, player2
 var ready = false
 
@@ -71,7 +71,7 @@ function create() {
 
 var UPDATES_PER_ROUNDTRIP = 6
 var currentRound = 0
-var replaying = true
+var discarded = 0
 
 function update() {
     if (!ready) {
@@ -79,23 +79,17 @@ function update() {
       return
     }
     currentRound++
-    var updateData = updateQueue.shift()
-    if (updateData) {
-        while (updateData.r < currentRound) {
-            replaying = true
-            doUpdate(player1, player2, updateData)
-            updateData = updateQueue.shift()
-            if (!updateData) {
-                break
-            }
+    while (updateQueue.length > 0) {
+        var updateData = updateQueue.shift()
+        if (updateData.r < currentRound) {
+            // drop old events for now
+            discarded++
+            continue
         }
-        if (updateData) {
-            replaying = false
-            doUpdate(player1, player2, updateData)
-        }
+        doUpdate(player1, player2, updateData)
     }
 
-    var forRound = currentRound + UPDATES_PER_ROUNDTRIP + 1
+    var forRound = currentRound + UPDATES_PER_ROUNDTRIP + 3
     commandQueue.push(new CommandData(player1.id, game.input, forRound).toJson())
 
     if (currentRound % UPDATES_PER_ROUNDTRIP === 0) {
@@ -119,10 +113,12 @@ function doUpdate (player1, player2, updateData) {
 }
 
 function render() {
+  /*
     game.debug.text('round: ' + currentRound, 32, 32)
     game.debug.text('commandQueue size: ' + commandQueue.length, 32, 48)
     game.debug.text('updateQueue size: ' + updateQueue.length, 32, 64)
-    game.debug.text('replaying: ' + replaying, 32, 80)
+    game.debug.text('discarded events: ' + discarded, 32, 80)
+    */
 }
 
 function CommandData (playerId, input, forRound) {

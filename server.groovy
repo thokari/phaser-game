@@ -27,6 +27,7 @@ def commands = []
 def playerIds = []
 def ready = false
 final int NUM_PLAYERS = 1
+def seenPlayers = 0
 
 def eb = vertx.eventBus()
 eb.consumer 'server.game', { msg ->
@@ -34,6 +35,12 @@ eb.consumer 'server.game', { msg ->
     switch (body.action) {
         case 'cmd':
             updateCommands(body, commands)
+            if (ready && commands.size() == 6) {
+                println "sending commands from round ${commands[0].r} to round ${commands[-1].r}"
+                def message = [ action: 'update', commands: commands ]
+                eb.publish('browser.game', message)
+                commands = []
+            }
             break
         case 'init':
             if (playerIds.size() < NUM_PLAYERS) {
@@ -66,8 +73,7 @@ eb.consumer 'server.game', { msg ->
     }
 }
 
-def updateCommands (body, commands) {
-    // println "${commands*.c*.d}"
+def updateCommandsOld (body, commands) {
     if (commands.size() > 0) {
         def (toPrepend, rest) = body.commands.split { it.r < commands[0]?.r }
         def (toMerge, toAppend) = rest.split { it.r <= commands[-1]?.r }
@@ -83,8 +89,22 @@ def updateCommands (body, commands) {
     }
 }
 
+def updateCommands (body, commands) {
+    if (commands.size() == 6) {
+        for(mergeCmd in body.commands) {
+            for(queuedCmd in commands) {
+                queuedCmd.c.addAll(mergeCmd.c)
+            }
+        }
+    } else {
+        commands.addAll(body.commands)
+    }
+}
+
+
 vertx.setPeriodic(100, {
     if (ready && commands.size() > 0) {
+        println "sending commands from round ${commands[0].r} to round ${commands[-1].r}"
         def message = [ action: 'update', commands: commands ]
         eb.publish('browser.game', message)
         commands = []
