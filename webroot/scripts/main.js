@@ -90,7 +90,7 @@ function update() {
     }
 
     var forRound = currentRound + UPDATES_PER_ROUNDTRIP + 3
-    commandQueue.push(new CommandData(player1.id, game.input, forRound).toJson())
+    commandQueue.push(new CommandData(player1.id, game.input, forRound))
 
     if (currentRound % UPDATES_PER_ROUNDTRIP === 0) {
         eb.send('server.game', {
@@ -129,13 +129,6 @@ function CommandData (playerId, input, forRound) {
         x: input.activePointer.x,
         y: input.activePointer.y
     }]
-}
-
-CommandData.prototype.toJson = function() {
-    return {
-        r: this.r,
-        c: this.c,
-    }
 }
 
 function Player (id) {

@@ -23,23 +23,25 @@ def options = [
 sockJSHandler.bridge(options)
 router.route('/eventbus/*').handler(sockJSHandler)
 
-def commands = []
+def commands = [] as Queue
 def playerIds = []
 def ready = false
 final int NUM_PLAYERS = 1
-def seenPlayers = 0
+def seenPlayers = []
 
 def eb = vertx.eventBus()
 eb.consumer 'server.game', { msg ->
     def body = msg.body()
     switch (body.action) {
         case 'cmd':
-            updateCommands(body, commands)
-            if (ready && commands.size() == 6) {
-                println "sending commands from round ${commands[0].r} to round ${commands[-1].r}"
-                def message = [ action: 'update', commands: commands ]
+            updateCommands(commands, body.commands)
+            seenPlayers = commands[5].c*.p
+            if (ready && seenPlayers.size() == NUM_PLAYERS) {
+                println "sending commands from round ${commands[0].r} to round ${commands[5].r}"
+                def message = [ action: 'update', commands: commands[0..5] ]
                 eb.publish('browser.game', message)
-                commands = []
+                seenPlayers = []
+                commands = commands - commands[0..5]
             }
             break
         case 'init':
@@ -73,43 +75,19 @@ eb.consumer 'server.game', { msg ->
     }
 }
 
-def updateCommandsOld (body, commands) {
-    if (commands.size() > 0) {
-        def (toPrepend, rest) = body.commands.split { it.r < commands[0]?.r }
-        def (toMerge, toAppend) = rest.split { it.r <= commands[-1]?.r }
-        for(mergeCmd in toMerge) {
-            for(queuedCmd in commands) {
-                queuedCmd.c.addAll(mergeCmd.c)
+def updateCommands (queuedCommands, newCommands) {
+    if (queuedCommands.size() == 0) {
+        queuedCommands.addAll newCommands
+    } else {
+        def (toMerge, toAppend) = newCommands.split { it.r <= queuedCommands[-1]?.r }
+        for (mergeCmd in toMerge) {
+            for (queuedCmd in queuedCommands) {
+                queuedCmd.c.addAll mergeCmd.c
             }
         }
-        commands.addAll(0, toPrepend)
-        commands.addAll(toAppend)
-    } else {
-        commands.addAll(body.commands)
+        queuedCommands.addAll toAppend
     }
 }
-
-def updateCommands (body, commands) {
-    if (commands.size() == 6) {
-        for(mergeCmd in body.commands) {
-            for(queuedCmd in commands) {
-                queuedCmd.c.addAll(mergeCmd.c)
-            }
-        }
-    } else {
-        commands.addAll(body.commands)
-    }
-}
-
-
-vertx.setPeriodic(100, {
-    if (ready && commands.size() > 0) {
-        println "sending commands from round ${commands[0].r} to round ${commands[-1].r}"
-        def message = [ action: 'update', commands: commands ]
-        eb.publish('browser.game', message)
-        commands = []
-    }
-})
 
 router.route('/*').handler(StaticHandler.create().setCachingEnabled(false))
 server.requestHandler(router.&accept).listen(8080, '0.0.0.0')
