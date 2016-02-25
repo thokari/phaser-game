@@ -3,6 +3,7 @@ var updateQueue = []
 var commandQueue = []
 var game, player1, player2
 var ready = false
+var debug = false
 
 eb.onopen = function () {
     player1 = new Player(generateUUID())
@@ -79,13 +80,16 @@ function update() {
       return
     }
     currentRound++
-    while (updateQueue.length > 0) {
+    while (updateQueue.length > 0 && updateQueue[0].r <= currentRound) {
         var updateData = updateQueue.shift()
+        console.log('want to update', updateData.r, ', current round is', currentRound)
         if (updateData.r < currentRound) {
             // drop old events for now
             discarded++
+            console.log('discarding')
             continue
         }
+        console.log('updating')
         doUpdate(player1, player2, updateData)
     }
 
@@ -113,22 +117,22 @@ function doUpdate (player1, player2, updateData) {
 }
 
 function render() {
-  /*
-    game.debug.text('round: ' + currentRound, 32, 32)
-    game.debug.text('commandQueue size: ' + commandQueue.length, 32, 48)
-    game.debug.text('updateQueue size: ' + updateQueue.length, 32, 64)
-    game.debug.text('discarded events: ' + discarded, 32, 80)
-    */
+    if (debug) {
+        game.debug.text('round: ' + currentRound, 32, 32)
+        game.debug.text('commandQueue size: ' + commandQueue.length, 32, 48)
+        game.debug.text('updateQueue size: ' + updateQueue.length, 32, 64)
+        game.debug.text('discarded events: ' + discarded, 32, 80)
+    }
 }
 
 function CommandData (playerId, input, forRound) {
     this.r = forRound,
-    this.c = [{
-        p: playerId,
+    this.p = playerId
+    this.c = {
         d: input.mousePointer.isDown,
         x: input.activePointer.x,
         y: input.activePointer.y
-    }]
+    }
 }
 
 function Player (id) {
