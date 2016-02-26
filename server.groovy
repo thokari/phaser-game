@@ -35,7 +35,7 @@ eb.consumer 'server.game', { msg ->
     switch (body.action) {
         case 'cmd':
             def commands = body.commands
-            assert commands.size() == CommandQueue.UPDATES_PER_ROUNDTRIP
+            // assert commands.size() == CommandQueue.UPDATES_PER_ROUNDTRIP
             def playerId = commands[0].p
             def fromRound = commands[0].r
             def toRound = commands[CommandQueue.UPDATES_PER_ROUNDTRIP - 1].r
@@ -86,15 +86,15 @@ server.requestHandler(router.&accept).listen(8080, '0.0.0.0')
 
 class CommandQueue {
 
-    static final int UPDATES_PER_ROUNDTRIP = 6
-    static final int NUM_PLAYERS = 1
+    static final int UPDATES_PER_ROUNDTRIP = 12
+    static final int NUM_PLAYERS = 2
 
     private Set playerIds = [] as Set
     private Map commandsByPlayers = [:]
     private int minRound = UPDATES_PER_ROUNDTRIP + 4
 
     void pushCommands (playerId, fromRound, toRound, newCommands) {
-        assert newCommands.size() == UPDATES_PER_ROUNDTRIP
+        //assert newCommands.size() == UPDATES_PER_ROUNDTRIP
         commandsByPlayers[playerId] += newCommands
         minRound = Math.min(minRound, fromRound)
     }

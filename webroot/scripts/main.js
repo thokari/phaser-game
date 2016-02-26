@@ -70,7 +70,7 @@ function create() {
     })
 }
 
-var UPDATES_PER_ROUNDTRIP = 6
+var UPDATES_PER_ROUNDTRIP = 12
 var currentRound = 0
 var discarded = 0
 
@@ -87,6 +87,7 @@ function update() {
             // drop old events for now
             discarded++
             console.log('discarding')
+            currentRound--
             continue
         }
         console.log('updating')
